@@ -28,21 +28,16 @@ pip install -r requirements.txt
 
 ### 3. 配置环境变量
 
-在项目根目录下创建一个 `.env` 文件，并添加以下内容：
-
-```env
-# Tom 的 OpenAI 配置
-OPENAI_API_KEY_TOM=your_tom_api_key
-OPENAI_API_BASE_URL_TOM=https://api.openai.com/v1
-OPENAI_API_MODEL_TOM=gpt-3.5-turbo
-
-# Jerry 的 OpenAI 配置
-OPENAI_API_KEY_JERRY=your_jerry_api_key
-OPENAI_API_BASE_URL_JERRY=https://api.openai.com/v1
-OPENAI_API_MODEL_JERRY=gpt-3.5-turbo
+1. 复制环境变量示例文件：
+```bash
+cp .env.example .env
 ```
 
-将 `your_tom_api_key` 和 `your_jerry_api_key` 替换为您的 OpenAI API 密钥。
+2. 编辑 `.env` 文件，替换示例值：
+- 将 `sk-your-tom-api-key-here` 替换为 Tom 的 OpenAI API 密钥
+- 将 `sk-your-jerry-api-key-here` 替换为 Jerry 的 OpenAI API 密钥
+
+注意：`.env` 文件包含敏感信息，已在 .gitignore 中配置，不会被提交到代码仓库。
 
 ### 4. 运行项目
 
@@ -73,7 +68,8 @@ python main.py
 Tom-and-Jerry/
 ├── main.py          # 主程序
 ├── README.md        # 项目说明
-├── .env             # 环境变量配置
+├── .env.example     # 环境变量配置模板
+├── .env             # 环境变量配置（本地）
 ├── requirements.txt # 项目依赖
 └── chats/           # 聊天记录存储目录
 ```
