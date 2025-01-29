@@ -159,6 +159,8 @@ class AIChat:
 
         self.is_running = True
         self.chat_history = []
+        self.debug_mode = False  # 新增：debug 模式开关
+        self.first_request = True  # 新增：是否为第一次请求
 
     def calculate_read_time(self, text):
         """计算阅读时间（秒）"""
@@ -172,16 +174,20 @@ class AIChat:
         try:
             if ai_role == "tom":
                 ai_model = self.tom_model
-                prompt = f"你是一个友好的AI助手，名叫Tom。我们正在讨论'{topic}'。请根据之前的对话内容继续对话，你是Tom。"
+                prompt = f"你是一个富有批判性思维的AI助手，名叫Tom。我们正在讨论'{topic}'。请根据之前的对话内容继续对话，你是Tom。"
             else:  # ai_role == "jerry"
                 ai_model = self.jerry_model
                 prompt = f"你是一个有思考深度的AI助手，名叫Jerry。我们正在讨论'{topic}'。请根据之前的对话内容继续对话，你是Jerry。"
 
-            print(f"\n{ICONS['system']} {Fore.YELLOW}请求 AI ({AI_NAMES[ai_role]}):{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}Prompt: {prompt}{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}Context: {context}{Style.RESET_ALL}")
+            if self.first_request or self.debug_mode:
+                print(f"\n{ICONS['system']} {Fore.YELLOW}请求 AI ({AI_NAMES[ai_role]}):{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Prompt: {prompt}{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Context: {context}{Style.RESET_ALL}")
+                self.first_request = False
             # 计算输入token
             input_tokens = ai_model.count_tokens(prompt + context)
+            if self.debug_mode:
+                print(f"{Fore.YELLOW}Input Tokens: {input_tokens}{Style.RESET_ALL}")
 
             # 获取流式响应
             response_stream = ai_model.get_stream_response(
@@ -204,6 +210,8 @@ class AIChat:
             sys.stdout.write(f"\n{icon} {color}{AI_NAMES[ai_role]}: {Style.RESET_ALL}")
             sys.stdout.flush()
             start_time = time.time()
+            if self.debug_mode:
+                debug_start_time = time.time()
             for chunk in response_stream:
                 if chunk.choices and hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content is not None :
                     content = chunk.choices[0].delta.content
@@ -211,8 +219,10 @@ class AIChat:
                     sys.stdout.write(f"{color}{content}{Style.RESET_ALL}")
                     sys.stdout.flush()
                     time.sleep(0.08)
-                if time.time() - start_time > 20: #设置20秒超时
-                    raise TimeoutError ("Timeout occurred while reading the stream")
+            if self.debug_mode:
+                debug_end_time = time.time()
+                response_time = debug_end_time - debug_start_time
+                print(f"{Fore.YELLOW}Response Time: {response_time:.2f} seconds{Style.RESET_ALL}")
 
 
             # 计算输出token并显示
@@ -222,9 +232,6 @@ class AIChat:
             sys.stdout.flush()
 
             return full_response, total_tokens
-        except TimeoutError as e:
-            print(f"\n{Fore.RED}Error: {str(e)}{Style.RESET_ALL}")
-            return None, 0
         except Exception as e:
            print(f"\n{Fore.RED}Error in get_chat_response: {str(e)}{Style.RESET_ALL}")
            return None, 0
@@ -234,16 +241,15 @@ class AIChat:
     def display_chat_history(self, chat_record):
         """显示历史聊天记录"""
         print(f"\n{Fore.CYAN}========= 历史聊天 ========={Style.RESET_ALL}")
-        stream_print(f"主题: {chat_record['topic']}", Fore.CYAN)
-        stream_print(f"时间: {chat_record['timestamp']}", Fore.CYAN)
+        print(f"{Fore.CYAN}主题: {chat_record['topic']}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}时间: {chat_record['timestamp']}{Style.RESET_ALL}")
         print()
 
         for entry in chat_record['chat_history']:
             if entry.startswith(AI_NAMES["tom"]):
-                stream_print(f"{ICONS['tom']} {entry}", Fore.BLUE)
+                print(f"{ICONS['tom']} {Fore.BLUE}{entry}{Style.RESET_ALL}")
             elif entry.startswith(AI_NAMES["jerry"]):
-                stream_print(f"{ICONS['jerry']} {entry}", Fore.RED)
-            time.sleep(0.5)
+                print(f"{ICONS['jerry']} {Fore.RED}{entry}{Style.RESET_ALL}")
         print(f"{Fore.CYAN}========================={Style.RESET_ALL}\n")
 
     def run_chat(self, topic, max_rounds):
@@ -323,56 +329,56 @@ def get_key():
     return None
 
 
+# 全局AI聊天实例
+ai_chat = AIChat()
+
 def main():
-    ai_chat = AIChat()
     print(f"{ICONS['system']} {Fore.CYAN}欢迎使用AI聊天系统！{Style.RESET_ALL}")
     signal.signal(signal.SIGINT, signal_handler)
 
+    options = ["开始新的聊天", "查看历史聊天", f"切换 Debug 模式 ({'Enabled' if ai_chat.debug_mode else 'Disabled'})"]
+    selected = 0
+    num_options = len(options)
+    # 显示初始菜单
+    print(f"\n{ICONS['system']} 请使用↑↓键选择，回车确认：")
+    display_menu(options, selected)
+
     while True:
-        options = ["开始新的聊天", "查看历史聊天"]
-        selected = 0
-        num_options = len(options)
-        # 显示初始菜单
-        print(f"\n{ICONS['system']} 请使用↑↓键选择，回车确认：")
-        display_menu(options, selected)
+        key = get_key()
+        if key == 'up' and selected > 0:
+            selected -= 1
+            display_menu(options, selected)
+        elif key == 'down' and selected < num_options - 1:
+            selected += 1
+            display_menu(options, selected)
+        elif key == 'enter':
+            display_menu(options,selected)
+            clear_lines(1)
+            break
 
+    if selected == 0:  # 开始新的聊天
+        topic = input(f"\n{Fore.YELLOW}请输入聊天主题: {Style.RESET_ALL}")
         while True:
-            key = get_key()
-            if key == 'up' and selected > 0:
-                selected -= 1
-                display_menu(options, selected)
-            elif key == 'down' and selected < num_options - 1:
-                selected += 1
-                display_menu(options, selected)
-            elif key == 'enter':
-                display_menu(options,selected)
-                clear_lines(1)
-                break
+            try:
+                max_rounds = int(input(f"\n{Fore.YELLOW}请输入最大对话轮数: {Style.RESET_ALL}"))
+                if max_rounds > 0:
+                    break
+                else:
+                    print(f"{Fore.RED}轮数必须是正整数。{Style.RESET_ALL}")
+            except ValueError:
+                print(f"{Fore.RED}请输入有效的整数。{Style.RESET_ALL}")
+        ai_chat.run_chat(topic, max_rounds)
+    elif selected == 1:  # 查看历史聊天
+        chats = ChatRecord.load_chats()
+        if not chats:
+            print(f"\n{ICONS['system']} {Fore.YELLOW}暂无历史聊天记录{Style.RESET_ALL}")
+        else:
+            print(f"\n{ICONS['system']} 历史聊天记录：")
+            chat_options = [f"{record['timestamp']} - {record['topic']}" for record in chats]
+            chat_options.append("返回主菜单")
+            selected = 0
 
-        if selected == 0:  # 开始新的聊天
-            topic = input(f"\n{Fore.YELLOW}请输入聊天主题: {Style.RESET_ALL}")
             while True:
-                try:
-                    max_rounds = int(input(f"\n{Fore.YELLOW}请输入最大对话轮数: {Style.RESET_ALL}"))
-                    if max_rounds > 0:
-                        break
-                    else:
-                         print(f"{Fore.RED}轮数必须是正整数。{Style.RESET_ALL}")
-                except ValueError:
-                     print(f"{Fore.RED}请输入有效的整数。{Style.RESET_ALL}")
-            ai_chat.run_chat(topic, max_rounds)
-        else:  # 查看历史聊天
-           chats = ChatRecord.load_chats()
-           if not chats:
-                print(f"\n{ICONS['system']} {Fore.YELLOW}暂无历史聊天记录{Style.RESET_ALL}")
-                continue
-
-           print(f"\n{ICONS['system']} 历史聊天记录：")
-           chat_options = [f"{record['timestamp']} - {record['topic']}" for record in chats]
-           chat_options.append("返回主菜单")
-           selected = 0
-
-           while True:
                 display_menu(chat_options, selected)
                 key = get_key()
                 if key == 'up' and selected > 0:
@@ -382,15 +388,19 @@ def main():
                     selected += 1
                     display_menu(chat_options, selected)
                 elif key == 'enter':
-                    display_menu(chat_options,selected)
-                    clear_lines(1)
-                    break
-                if selected == len(chat_options) - 1:  # 返回主菜单
-                     break
-                elif selected >= 0:
-                    ai_chat.display_chat_history(chats[selected])
-                    input(f"\n{Fore.YELLOW}按回车键返回...{Style.RESET_ALL}")
-                    break
+                    if selected == len(chat_options) - 1:  # 返回主菜单
+                        main()  # 返回主菜单
+                        return
+                    else:
+                        ai_chat.display_chat_history(chats[selected])
+                        input(f"\n{Fore.YELLOW}按回车键返回...{Style.RESET_ALL}")
+                        print(f"\n{ICONS['system']} 历史聊天记录：")  # 重新显示标题
+                        display_menu(chat_options, selected)  # 重新显示菜单
+    elif selected == 2: # 切换 Debug 模式
+        ai_chat.debug_mode = not ai_chat.debug_mode
+        options[2] = f"切换 Debug 模式 ({'Enabled' if ai_chat.debug_mode else 'Disabled'})"
+        display_menu(options, selected)
+        main()  # 重新回到主菜单
 
 
 if __name__ == "__main__":
