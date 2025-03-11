@@ -9,7 +9,7 @@ from datetime import datetime
 import tiktoken
 import sys
 import signal
-import readchar  # 引入 readchar
+import readchar
 
 # 初始化colorama
 init()
@@ -17,6 +17,8 @@ init()
 # 加载环境变量
 load_dotenv()
 
+TOM_PROMPT = "你扮演Tom，围绕{topic}主题进行对话，保持幽默风格。不要在回复中包含自己的名字。输出仅纯文本，无Markdown。"
+JERRY_PROMPT = "你扮演Jerry，围绕{topic}主题进行对话，保持严谨风格。不要在回复中包含自己的名字。输出仅纯文本，无Markdown。"
 # 角色图标
 ICONS = {
     "tom": "🔵",  # Tom
@@ -148,6 +150,8 @@ class AIChat:
         # 初始化 Tom 模型
         tom_api_key = os.getenv("OPENAI_API_KEY_TOM")
         tom_api_base = os.getenv("OPENAI_API_BASE_URL_TOM")
+        self.tom_prompt = os.getenv('TOM_PROMPT', TOM_PROMPT)
+        
         tom_model = os.getenv("OPENAI_API_MODEL_TOM", "gpt-3.5-turbo")
         self.tom_model = AIModel(tom_api_key, tom_api_base, tom_model)
 
@@ -155,6 +159,8 @@ class AIChat:
         jerry_api_key = os.getenv("OPENAI_API_KEY_JERRY")
         jerry_api_base = os.getenv("OPENAI_API_BASE_URL_JERRY")
         jerry_model = os.getenv("OPENAI_API_MODEL_JERRY", "gpt-3.5-turbo")
+        self.jerry_prompt = os.getenv('JERRY_PROMPT', JERRY_PROMPT)
+        
         self.jerry_model = AIModel(jerry_api_key, jerry_api_base, jerry_model)
 
         self.is_running = True
@@ -174,10 +180,10 @@ class AIChat:
         try:
             if ai_role == "tom":
                 ai_model = self.tom_model
-                prompt = f"你是一个富有批判性思维的AI助手，名叫Tom。我们正在讨论'{topic}'。请根据之前的对话内容继续对话，你是Tom。"
+                prompt = self.tom_prompt.replace("{topic}", topic)
             else:  # ai_role == "jerry"
                 ai_model = self.jerry_model
-                prompt = f"你是一个有思考深度的AI助手，名叫Jerry。我们正在讨论'{topic}'。请根据之前的对话内容继续对话，你是Jerry。"
+                prompt = self.jerry_prompt.replace("{topic}", topic)
 
             if self.first_request or self.debug_mode:
                 print(f"\n{ICONS['system']} {Fore.YELLOW}请求 AI ({AI_NAMES[ai_role]}):{Style.RESET_ALL}")
