@@ -17,8 +17,8 @@ init()
 # 加载环境变量
 load_dotenv()
 
-TOM_PROMPT = "你扮演Tom，围绕{topic}主题进行对话，保持幽默风格。不要在回复中包含自己的名字。输出仅纯文本，无Markdown。"
-JERRY_PROMPT = "你扮演Jerry，围绕{topic}主题进行对话，保持严谨风格。不要在回复中包含自己的名字。输出仅纯文本，无Markdown。"
+TOM_PROMPT = "你扮演Tom，围绕{topic}主题进行对话，保持幽默风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。如果这是最后一轮对话，请给出一个幽默的总结。"
+JERRY_PROMPT = "你扮演Jerry，围绕{topic}主题进行对话，保持严谨风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。如果这是最后一轮对话，请给出一个严谨的总结。"
 # 角色图标
 ICONS = {
     "tom": "🔵",  # Tom
@@ -175,15 +175,15 @@ class AIChat:
         read_time = char_count / 4
         return max(2, min(10, read_time))
 
-    def get_chat_response(self, ai_role, topic, context):
+    def get_chat_response(self, ai_role, topic, context, current_round=1, total_rounds=1):
         """获取AI回应"""
         try:
             if ai_role == "tom":
                 ai_model = self.tom_model
-                prompt = self.tom_prompt.replace("{topic}", topic)
+                prompt = self.tom_prompt.replace("{topic}", topic).replace("{current_round}", str(current_round)).replace("{total_rounds}", str(total_rounds))
             else:  # ai_role == "jerry"
                 ai_model = self.jerry_model
-                prompt = self.jerry_prompt.replace("{topic}", topic)
+                prompt = self.jerry_prompt.replace("{topic}", topic).replace("{current_round}", str(current_round)).replace("{total_rounds}", str(total_rounds))
 
             if self.first_request or self.debug_mode:
                 print(f"\n{ICONS['system']} {Fore.YELLOW}请求 AI ({AI_NAMES[ai_role]}):{Style.RESET_ALL}")
@@ -267,20 +267,31 @@ class AIChat:
         round_num = 1
 
         try:
-
-            # Tom 先发言
-            initial_statement, tokens = self.get_chat_response("tom", topic, f"请针对主题'{topic}' 开启对话。你是Tom。")
-            if initial_statement:
-                  self.chat_history.append(f"{AI_NAMES['tom']}: {initial_statement}")
-                  context += f"\n{AI_NAMES['tom']}: {initial_statement}"
-                  time.sleep(self.calculate_read_time(initial_statement))
-
-
             while self.is_running and round_num <= max_rounds:
                 print(f"\n{ICONS['system']} {Fore.CYAN}=== 第 {round_num} 轮对话 ==={Style.RESET_ALL}")
 
+                # Tom 发言
+                tom_response, tom_tokens = self.get_chat_response(
+                    "tom", 
+                    topic, 
+                    context, 
+                    current_round=round_num,
+                    total_rounds=max_rounds
+                )
+                if not tom_response:
+                    break
+                self.chat_history.append(f"{AI_NAMES['tom']}: {tom_response}")
+                context += f"\n{AI_NAMES['tom']}: {tom_response}"
+                time.sleep(self.calculate_read_time(tom_response))
+
                 # Jerry 回应
-                jerry_response, jerry_tokens = self.get_chat_response("jerry", topic, context)
+                jerry_response, jerry_tokens = self.get_chat_response(
+                    "jerry", 
+                    topic, 
+                    context,
+                    current_round=round_num,
+                    total_rounds=max_rounds
+                )
                 if not jerry_response:
                     break
                 self.chat_history.append(f"{AI_NAMES['jerry']}: {jerry_response}")
@@ -291,19 +302,6 @@ class AIChat:
                     print(f"\n{ICONS['system']} {Fore.YELLOW}已达到最大对话轮数，聊天结束。{Style.RESET_ALL}")
                     break
 
-                round_num += 1
-
-                # Tom 回应
-                tom_response, tom_tokens = self.get_chat_response("tom", topic, context)
-                if not tom_response:
-                    break
-                self.chat_history.append(f"{AI_NAMES['tom']}: {tom_response}")
-                context += f"\n{AI_NAMES['tom']}: {tom_response}"
-                time.sleep(self.calculate_read_time(tom_response))
-
-                if round_num > max_rounds:  # 再次检查，防止 max_rounds 设置过小时，Tom 又回复了一句
-                    print(f"\n{ICONS['system']} {Fore.YELLOW}已达到最大对话轮数，聊天结束。{Style.RESET_ALL}")
-                    break
                 round_num += 1
 
         except KeyboardInterrupt:
