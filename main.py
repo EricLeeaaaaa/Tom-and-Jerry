@@ -17,8 +17,8 @@ init()
 # 加载环境变量
 load_dotenv()
 
-TOM_PROMPT = "你扮演Tom，围绕{topic}主题进行对话，保持幽默风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。如果这是最后一轮对话，请给出一个幽默的总结。"
-JERRY_PROMPT = "你扮演Jerry，围绕{topic}主题进行对话，保持严谨风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。如果这是最后一轮对话，请给出一个严谨的总结。"
+TOM_PROMPT = "你扮演Tom，围绕{topic}主题进行对话，保持严谨风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。请注意，只有当对话进行到总共{total_rounds}轮时，才是最后一轮对话，请在那时给出幽默的总结，在此之前请勿总结。"
+JERRY_PROMPT = "你扮演Jerry，围绕{topic}主题进行对话，保持幽默风格。不要在回复中包含自己的名字。请以纯文本格式回答，绝对不使用任何Markdown语法。禁止包含代码块、列表符号、标题符号等格式。所有内容必须保持纯文本形式。当前是第{current_round}轮对话，总共{total_rounds}轮。请注意，只有当对话进行到总共{total_rounds}轮时，才是最后一轮对话，请在那时给出严谨的总结，在此之前请勿总结。"
 # 角色图标
 ICONS = {
     "tom": "🔵",  # Tom
@@ -234,14 +234,14 @@ class AIChat:
             # 计算输出token并显示
             output_tokens = ai_model.count_tokens(full_response)
             total_tokens = input_tokens + output_tokens
-            sys.stdout.write(f" [{total_tokens}]\n")
+            if self.debug_mode:
+                sys.stdout.write(f" [{total_tokens}]\n")
             sys.stdout.flush()
 
             return full_response, total_tokens
         except Exception as e:
            print(f"\n{Fore.RED}Error in get_chat_response: {str(e)}{Style.RESET_ALL}")
            return None, 0
-
 
 
     def display_chat_history(self, chat_record):
